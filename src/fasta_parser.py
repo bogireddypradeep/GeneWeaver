@@ -1,8 +1,8 @@
-
 """
 GeneWeaver - FASTA Parser
 
-Reads DNA sequences from FASTA files using Biopython.
+Reads and validates DNA sequences from FASTA files using Biopython.
+Supports all 15 standard IUPAC DNA nucleotide symbols.
 """
 
 from pathlib import Path
@@ -10,13 +10,12 @@ from typing import Dict
 
 from Bio import SeqIO
 
-
-VALID_BASES = set("ACGTN")
+from src.sequence_validation import validate_dna_sequence
 
 
 def parse_fasta(file_path: str) -> Dict[str, str]:
     """
-    Parse a FASTA file and return its sequences.
+    Parse a FASTA file and return its validated DNA sequences.
 
     Args:
         file_path: Path to the FASTA file.
@@ -26,7 +25,8 @@ def parse_fasta(file_path: str) -> Dict[str, str]:
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If the file contains no valid sequences or invalid bases.
+        ValueError: If the file contains no valid sequences,
+                    duplicate IDs, or invalid DNA symbols.
     """
 
     path = Path(file_path)
@@ -39,20 +39,10 @@ def parse_fasta(file_path: str) -> Dict[str, str]:
     try:
         for record in SeqIO.parse(str(path), "fasta"):
             sequence_id = record.id
-            sequence = str(record.seq).upper()
-
-            if not sequence:
-                raise ValueError(
-                    f"Sequence '{sequence_id}' is empty."
-                )
-
-            invalid_bases = set(sequence) - VALID_BASES
-
-            if invalid_bases:
-                raise ValueError(
-                    f"Sequence '{sequence_id}' contains invalid bases: "
-                    f"{sorted(invalid_bases)}"
-                )
+            sequence = validate_dna_sequence(
+                str(record.seq),
+                f"Sequence '{sequence_id}'"
+            )
 
             if sequence_id in sequences:
                 raise ValueError(
@@ -61,7 +51,7 @@ def parse_fasta(file_path: str) -> Dict[str, str]:
 
             sequences[sequence_id] = sequence
 
-    except ValueError:
+    except (ValueError, TypeError):
         raise
 
     except Exception as exc:

@@ -74,3 +74,24 @@ def test_duplicate_sequence_identifiers(tmp_path):
 
     with pytest.raises(ValueError):
         parse_fasta(str(fasta))
+def test_parse_all_iupac_symbols(tmp_path):
+    fasta_file = tmp_path / "iupac.fasta"
+    fasta_file.write_text(
+        ">iupac_sequence\nACGTRYSWKMBDHVN\n",
+        encoding="utf-8"
+    )
+
+    sequences = parse_fasta(str(fasta_file))
+
+    assert sequences["iupac_sequence"] == "ACGTRYSWKMBDHVN"
+
+
+def test_reject_unsupported_dna_symbols(tmp_path):
+    fasta_file = tmp_path / "invalid.fasta"
+    fasta_file.write_text(
+        ">invalid_sequence\nACGTXYZ\n",
+        encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError):
+        parse_fasta(str(fasta_file))

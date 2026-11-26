@@ -1,11 +1,17 @@
 
 """
 GeneWeaver - CPU Sequence Alignment
-Smith-Waterman local alignment implementation.
+Smith-Waterman local alignment with IUPAC DNA support.
 """
 
 from dataclasses import dataclass
+
 import numpy as np
+
+from src.sequence_validation import validate_dna_sequence
+
+
+CANONICAL_BASES = set("ACGT")
 
 
 @dataclass
@@ -21,6 +27,28 @@ class AlignmentResult:
     reference_end: int
 
 
+def get_substitution_score(
+    base1: str,
+    base2: str,
+    match_score: int,
+    mismatch_score: int,
+) -> int:
+    """
+    Calculate the substitution score for two DNA bases.
+
+    Only identical canonical bases receive a positive match score.
+    Comparisons involving ambiguous IUPAC symbols receive zero.
+    """
+
+    if base1 not in CANONICAL_BASES or base2 not in CANONICAL_BASES:
+        return 0
+
+    if base1 == base2:
+        return match_score
+
+    return mismatch_score
+
+
 def smith_waterman(
     query: str,
     reference: str,
@@ -34,48 +62,36 @@ def smith_waterman(
     Args:
         query: Query DNA sequence.
         reference: Reference DNA sequence.
-        match_score: Score for matching bases.
-        mismatch_score: Penalty for mismatching bases.
+        match_score: Score for identical canonical bases.
+        mismatch_score: Penalty for different canonical bases.
         gap_penalty: Penalty for insertion or deletion.
 
     Returns:
         AlignmentResult containing score and aligned sequences.
     """
 
-    query = query.upper()
-    reference = reference.upper()
-
-    if not query or not reference:
-        raise ValueError("Query and reference sequences must not be empty.")
-
-    valid_bases = set("ACGTN")
-
-    if not set(query).issubset(valid_bases):
-        raise ValueError("Query contains unsupported DNA characters.")
-
-    if not set(reference).issubset(valid_bases):
-        raise ValueError("Reference contains unsupported DNA characters.")
+    query = validate_dna_sequence(query, "Query")
+    reference = validate_dna_sequence(reference, "Reference")
 
     rows = len(query) + 1
     cols = len(reference) + 1
 
-    # Dynamic programming score matrix.
     matrix = np.zeros((rows, cols), dtype=np.int32)
 
-    # Traceback directions: 0=stop, 1=diagonal, 2=up, 3=left.
+    # 0=stop, 1=diagonal, 2=up, 3=left.
     traceback = np.zeros((rows, cols), dtype=np.uint8)
 
     best_score = 0
     best_position = (0, 0)
 
-    # Fill the dynamic programming matrix.
     for i in range(1, rows):
         for j in range(1, cols):
 
-            substitution = (
-                match_score
-                if query[i - 1] == reference[j - 1]
-                else mismatch_score
+            substitution = get_substitution_score(
+                query[i - 1],
+                reference[j - 1],
+                match_score,
+                mismatch_score,
             )
 
             diagonal = matrix[i - 1, j - 1] + substitution
@@ -98,7 +114,6 @@ def smith_waterman(
                 best_score = int(score)
                 best_position = (i, j)
 
-    # Reconstruct the best local alignment.
     i, j = best_position
 
     aligned_query = []

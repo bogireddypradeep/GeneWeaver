@@ -1,7 +1,6 @@
-
 import pytest
 
-from src.alignment import smith_waterman
+from src.alignment import smith_waterman, get_substitution_score
 
 
 def test_exact_match():
@@ -61,6 +60,25 @@ def test_case_insensitive_alignment():
 def test_ambiguous_base_n():
     result = smith_waterman("ACNT", "ACNT")
 
-    assert result.score == 8
+    assert result.score == 6
     assert result.aligned_query == "ACNT"
     assert result.aligned_reference == "ACNT"
+
+
+def test_all_iupac_symbols_supported():
+    result = smith_waterman("ACGTRYSWKMBDHVN", "ACGTRYSWKMBDHVN")
+
+    assert result.score == 8
+
+
+def test_ambiguous_symbols_receive_zero_score():
+    assert get_substitution_score("N", "N", 2, -1) == 0
+    assert get_substitution_score("R", "Y", 2, -1) == 0
+
+
+def test_canonical_match_score():
+    assert get_substitution_score("A", "A", 2, -1) == 2
+
+
+def test_canonical_mismatch_score():
+    assert get_substitution_score("A", "T", 2, -1) == -1
